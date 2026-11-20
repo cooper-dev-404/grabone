@@ -82,8 +82,8 @@
 需要 **macOS 15 或更新版本**，以及包含 macOS 15 或更新 SDK 的 Xcode Command Line Tools。
 
 ```bash
-git clone https://github.com/cooper-dev-404/grabone-macos.git
-cd grabone-macos
+git clone https://github.com/cooper-dev-404/grabone.git
+cd grabone
 ./Scripts/build.sh
 open "dist/截一屏.app"
 ```
