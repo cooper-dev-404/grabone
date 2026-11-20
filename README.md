@@ -13,6 +13,7 @@
 <p align="center">
   <code>macOS 15+</code> &nbsp;·&nbsp; <code>v0.2.2</code><br>
   <a href="#从源码运行"><strong>从源码运行</strong></a> &nbsp;·&nbsp;
+  <a href="#偏好设置">偏好设置</a> &nbsp;·&nbsp;
   <a href="#默认快捷键">默认快捷键</a>
 </p>
 
@@ -25,6 +26,31 @@
 - **圈出重点。** 在冻结画面中框选，可吸附窗口、按像素微调。用箭头指向报错，给字段加文字说明，或用马赛克遮住账号，再复制或保存为 PNG、JPEG。
 - **把参考图留在桌面。** 截图和剪贴板里的图片都能贴在其他窗口上方。贴图可缩放、调透明度或开启鼠标穿透，方便一边操作一边对照。
 - **对照原文和译文。** 点贴图的眼睛图标切换显示，或从贴图菜单分别复制译文和 OCR 原文。保存图片时保留原始画面及手动标注。
+
+## 偏好设置
+
+点击菜单栏的「文」图标，打开「设置…」。截图、贴图和翻译等设置可按页恢复默认值。
+
+<p align="center">
+  <img src="docs/images/preferences-capture.png" width="589" alt="截一屏偏好设置的截图显示页，可调整选区边框、遮罩深度、锚点和十字线。">
+</p>
+
+- **界面与截图**可调整选区颜色、放大倍率、遮罩和窗口吸附。
+- **贴图与输出**可设置贴图透明度、双击行为、图片格式与默认保存文件夹。
+- **翻译与控制**可选择源语言和目标语言，也能给三个全局操作换上顺手的组合键，例如用 ⌘F1 框选截图。
+
+<details>
+<summary>查看翻译和快捷键设置</summary>
+
+<p align="center">
+  <img src="docs/images/preferences-translation.png" width="589" alt="截一屏翻译设置，可选择源语言自动识别和目标语言。">
+</p>
+
+<p align="center">
+  <img src="docs/images/preferences-hotkeys.png" width="589" alt="截一屏控制设置，可分别修改区域截图、截图翻译和剪贴板贴图的全局快捷键。">
+</p>
+
+</details>
 
 ## 默认快捷键
 
