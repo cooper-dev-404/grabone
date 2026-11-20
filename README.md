@@ -6,8 +6,8 @@
 </h1>
 
 <p align="center">
-  <strong>框选屏幕上的外文，译文就在原文的位置出现。</strong><br>
-  截下英文报错，先读懂原因，再把保留原文和标注的截图发给技术支持。
+  <strong>框选后直接标注、把截图置顶，或在原文的位置读译文。</strong><br>
+  截下英文报错时，可以先在贴图里读中文，再把保留英文和标注的截图发给技术支持。
 </p>
 
 <p align="center">
@@ -82,8 +82,8 @@
 需要 **macOS 15 或更新版本**，以及包含 macOS 15 或更新 SDK 的 Xcode Command Line Tools。
 
 ```bash
-git clone https://github.com/cooper-dev-404/grabone.git
-cd grabone
+git clone https://github.com/cooper-dev-404/grabone-macos.git
+cd grabone-macos
 ./Scripts/build.sh
 open "dist/截一屏.app"
 ```
