@@ -1,21 +1,28 @@
-<h1 align="center">
-  <picture>
-    <source media="(max-width: 600px)" srcset="docs/images/cover-mobile.png">
-    <img src="docs/images/cover.png" alt="截一屏 · GrabOne。macOS 截图、贴图与原位翻译工具。封面展示同一条英文报错在贴图中原位切换成中文。" width="1200">
-  </picture>
-</h1>
+<p align="center">
+  <img src="docs/images/app-icon.png" width="104" height="104" alt="截一屏应用图标，取景框中的翠鸟。">
+</p>
+
+<h1 align="center">截一屏</h1>
+
+<p align="center"><strong>截下外文界面，直接在原处阅读译文。</strong></p>
 
 <p align="center">
-  <strong>框选后直接标注、把截图置顶，或在原文的位置读译文。</strong><br>
-  截下英文报错时，可以先在贴图里读中文，再把保留英文和标注的截图发给技术支持。
+  截一屏（GrabOne）是 Mac 菜单栏截图工具。<br>
+  框选后可添加标注、置顶贴图或翻译。
 </p>
 
 <p align="center">
-  <code>macOS 15+</code> &nbsp;·&nbsp; <code>v0.2.2</code><br>
-  <a href="#从源码运行"><strong>从源码运行</strong></a> &nbsp;·&nbsp;
-  <a href="#偏好设置">偏好设置</a> &nbsp;·&nbsp;
-  <a href="#默认快捷键">默认快捷键</a>
+  <a href="#从源码运行">在 Mac 上运行</a> ·
+  <a href="#从选区到标注">使用指南</a> ·
+  <a href="#偏好设置">偏好设置</a>
 </p>
+
+<picture>
+  <source media="(max-width: 600px)" srcset="docs/images/translation-demo-mobile.png">
+  <img src="docs/images/translation-demo.png" alt="同一张贴图的原位翻译对照，展示英文报错原文和在对应位置绘制的中文译文。" width="1200">
+</picture>
+
+演示使用合成报错样图，由本机语言包翻译。按 <kbd>⌃⌥T</kbd> 框选后，点眼睛图标切回原图。
 
 ## 从选区到标注
 
@@ -25,7 +32,7 @@
 
 - **圈出重点。** 在冻结画面中框选，可吸附窗口、按像素微调。用箭头指向报错，给字段加文字说明，或用马赛克遮住账号，再复制或保存为 PNG、JPEG。
 - **把参考图留在桌面。** 截图和剪贴板里的图片都能贴在其他窗口上方。贴图可缩放、调透明度或开启鼠标穿透，方便一边操作一边对照。
-- **对照原文和译文。** 点贴图的眼睛图标切换显示，或从贴图菜单分别复制译文和 OCR 原文。保存图片时保留原始画面及手动标注。
+- **分开复制文字和图片。** 从贴图菜单可以单独复制译文或 OCR 原文。复制、保存图片时保留原始画面及手动标注。
 
 ## 偏好设置
 
@@ -79,7 +86,7 @@
 
 ## 从源码运行
 
-需要 **macOS 15 或更新版本**，以及包含 macOS 15 或更新 SDK 的 Xcode Command Line Tools。
+当前版本为 **v0.2.2**。运行需 **macOS 15 或更新版本**，从源码构建需安装包含 macOS 15 或更新 SDK 的 Xcode Command Line Tools。
 
 ```bash
 git clone https://github.com/cooper-dev-404/grabone.git
@@ -97,7 +104,7 @@ open "dist/截一屏.app"
 
 应用使用 Swift、AppKit 和 SwiftUI。ScreenCaptureKit 负责采集屏幕，Vision 识别文字及坐标，Apple Translation 负责翻译。贴图窗口独立绘制译文，图片导出时只合成原始位图和手动标注。
 
-运行 `./Scripts/check.sh` 可检查快捷键配置、Retina 裁剪、OCR 坐标、翻译取消、PNG 导出一致性及 JPEG 输出。封面展示的是当前版本用合成报错样图和本机语言包生成的译文。实体键盘跨应用触发、真实桌面采集和外接显示器框选仍待实测。
+运行 `./Scripts/check.sh` 可检查快捷键配置、Retina 裁剪、OCR 坐标、翻译取消、PNG 导出一致性及 JPEG 输出。实体键盘跨应用触发、真实桌面采集和外接显示器框选仍待实测。
 
 更多细节见 [产品与交互](产品与交互.md)。
 
