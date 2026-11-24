@@ -80,7 +80,7 @@
 | <kbd>⌘</kbd> <kbd>S</kbd> | 保存截图 |
 | <kbd>P</kbd> / <kbd>T</kbd> | 贴图 / 原位翻译 |
 | <kbd>⌘</kbd> <kbd>Z</kbd> / <kbd>⇧</kbd> <kbd>⌘</kbd> <kbd>Z</kbd> | 撤销 / 重做标注 |
-| <kbd>Esc</kbd> | 退出截图 |
+| <kbd>Esc</kbd> | 取消正在输入的文字或退出当前标注工具。回到选区工具后按 Esc 退出截图 |
 
 </details>
 

@@ -115,25 +115,20 @@ final class CaptureController {
     }
 }
 
-private final class CaptureButton: NSButton {
-    override var acceptsFirstResponder: Bool { false }
-}
-
 @MainActor
 private final class CaptureCanvas: NSView, NSTextFieldDelegate {
     private enum Drag { case new(CGPoint), move(CGPoint, CGRect), resize(CGRect, Int, Int), mark }
+
+    private struct AnnotationStyle {
+        var color: NSColor
+        var size = 1
+        var width: CGFloat { [1.6, 2.8, 4.8][size] }
+    }
     private let snapshot: CGImage
     private let snapRects: [CGRect]
     private let mode: CaptureMode
     private let accent = Preferences.accent
-    private let toolbar = NSVisualEffectView()
-    private let toolRow = NSStackView()
-    private let actionRow = NSStackView()
-    private let optionRow = NSStackView()
-    private let optionDivider = NSBox()
-    private var undoButton: NSButton?
-    private var redoButton: NSButton?
-    private var markButtons: [MarkTool: NSButton] = [:]
+    private let toolbar = CaptureToolbar(frame: .zero)
     private var selection: CGRect?
     private var suggested: CGRect?
     private var pointer: CGPoint?
@@ -145,10 +140,29 @@ private final class CaptureCanvas: NSView, NSTextFieldDelegate {
     private var field: NSTextField?
     private var textOrigin: CGPoint?
     private var manualSelection = false
-    private let markPalette: [(color: NSColor, name: String)] = [
-        (.systemRed, "红色"), (.systemBlue, "蓝色"), (.systemYellow, "黄色"), (.white, "白色"), (.black, "黑色")
-    ]
-    private var markColor = NSColor.systemRed
+    private var inkStyle = AnnotationStyle(color: .systemRed)
+    private var highlightStyle = AnnotationStyle(color: .systemYellow)
+    private var textStyle = AnnotationStyle(color: .systemRed)
+    private var mosaicStyle = AnnotationStyle(color: .clear)
+
+    private var style: AnnotationStyle {
+        get {
+            switch activeTool {
+            case .highlighter: highlightStyle
+            case .text: textStyle
+            case .mosaic: mosaicStyle
+            default: inkStyle
+            }
+        }
+        set {
+            switch activeTool {
+            case .highlighter: highlightStyle = newValue
+            case .text: textStyle = newValue
+            case .mosaic: mosaicStyle = newValue
+            default: inkStyle = newValue
+            }
+        }
+    }
 
     var cancel: (() -> Void)?
     var complete: ((CaptureDocument, CaptureAction, CGRect) -> Void)?
@@ -163,7 +177,9 @@ private final class CaptureCanvas: NSView, NSTextFieldDelegate {
         self.snapRects = snapRects
         self.mode = mode
         super.init(frame: frame)
-        setupToolbar()
+        toolbar.frame = bounds
+        toolbar.onCommand = { [weak self] command in self?.perform(command) }
+        addSubview(toolbar)
     }
 
     required init?(coder: NSCoder) { nil }
@@ -222,7 +238,7 @@ private final class CaptureCanvas: NSView, NSTextFieldDelegate {
         if let selection, let tool = activeTool, selection.contains(location) {
             let origin = location - selection.origin
             if tool == .text { beginText(at: location, relative: origin); return }
-            currentMark = Mark(tool: tool, origin: origin, color: markColor, width: markWidth)
+            currentMark = Mark(tool: tool, origin: origin, color: style.color, width: style.width)
             drag = .mark
         } else if let selection, marks.isEmpty, selection.insetBy(dx: -5, dy: -5).contains(location) {
             let (x, y) = resizeEdges(at: location, area: selection)
@@ -283,7 +299,9 @@ private final class CaptureCanvas: NSView, NSTextFieldDelegate {
         let mods = event.modifierFlags.intersection([.control, .option, .shift, .command])
         let key = event.charactersIgnoringModifiers?.lowercased() ?? ""
         switch (event.keyCode, key) {
-        case (53, _): cancel?()
+        case (53, _):
+            if activeTool == nil { cancel?() }
+            else { activeTool = nil; updateUI() }
         case (36, _), (76, _): finish(mode == .translate ? .translate : .copy)
         case (48, _): manualSelection.toggle(); updateSuggestion(); needsDisplay = true
         case (_, "c") where mods.contains(.command): finish(.copy)
@@ -338,8 +356,11 @@ private final class CaptureCanvas: NSView, NSTextFieldDelegate {
     }
 
     private func cursor(at point: CGPoint) -> NSCursor {
-        guard activeTool == nil, marks.isEmpty, let selection,
-              selection.insetBy(dx: -5, dy: -5).contains(point) else { return .crosshair }
+        if toolbar.containsControl(at: point) { return .arrow }
+        guard let selection else { return .crosshair }
+        if let activeTool, selection.contains(point) { return activeTool == .text ? .iBeam : .crosshair }
+        if !marks.isEmpty { return .arrow }
+        guard selection.insetBy(dx: -5, dy: -5).contains(point) else { return .crosshair }
         let (x, y) = resizeEdges(at: point, area: selection)
         if x != 0 { return .resizeLeftRight }
         if y != 0 { return .resizeUpDown }
@@ -390,12 +411,6 @@ private final class CaptureCanvas: NSView, NSTextFieldDelegate {
         complete?(document, action, area)
     }
 
-    private var thickness: NSSegmentedControl?
-    private var markWidth: CGFloat {
-        let widths: [CGFloat] = [1.6, 2.8, 4.8]
-        return widths[thickness?.selectedSegment.clamped(to: 0...2) ?? 1]
-    }
-
     private func append(_ mark: Mark) {
         marks.append(mark)
         undone.removeAll()
@@ -406,14 +421,14 @@ private final class CaptureCanvas: NSView, NSTextFieldDelegate {
         let width = min(260, selection.maxX - location.x)
         guard width >= 24 else { return }
         let field = NSTextField(frame: CGRect(x: location.x, y: location.y, width: width, height: 25))
-        field.font = .systemFont(ofSize: 10 + markWidth * 3, weight: .semibold)
+        field.font = .systemFont(ofSize: 10 + style.width * 3, weight: .semibold)
         field.placeholderString = "输入文字"
         field.delegate = self
         field.target = self
         field.action = #selector(endText)
         self.field = field
         textOrigin = relative
-        addSubview(field)
+        addSubview(field, positioned: .below, relativeTo: toolbar)
         window?.makeFirstResponder(field)
     }
 
@@ -430,157 +445,74 @@ private final class CaptureCanvas: NSView, NSTextFieldDelegate {
         self.field = nil
         textOrigin = nil
         if !content.isEmpty {
-            append(Mark(tool: .text, origin: origin, color: markColor, width: markWidth, text: content))
+            append(Mark(tool: .text, origin: origin, color: style.color, width: style.width, text: content))
         }
     }
 
-    private func setupToolbar() {
-        toolbar.material = .hudWindow
-        toolbar.state = .active
-        toolbar.blendingMode = .withinWindow
-        toolbar.wantsLayer = true
-        toolbar.layer?.cornerRadius = 10
-        toolbar.layer?.masksToBounds = true
-        toolbar.isHidden = true
-        addSubview(toolbar)
+    func controlTextDidChange(_ obj: Notification) { updateUI() }
 
-        toolRow.spacing = 2
-        toolRow.orientation = .horizontal
-        actionRow.spacing = 4
-        actionRow.orientation = .horizontal
-        optionRow.spacing = 7
-        optionRow.orientation = .horizontal
-        for tool in MarkTool.allCases {
-            let button = button(tool.info.symbol, tool.info.title, action: #selector(toggleTool(_:)))
-            button.tag = markButtons.count
-            button.setButtonType(.toggle)
-            markButtons[tool] = button
-            toolRow.addArrangedSubview(button)
-        }
-        toolRow.addArrangedSubview(NSBox.separator())
-        let undoButton = button("arrow.uturn.backward", "撤销 ⌘Z", action: #selector(undo))
-        let redoButton = button("arrow.uturn.forward", "重做 ⇧⌘Z", action: #selector(redo))
-        self.undoButton = undoButton
-        self.redoButton = redoButton
-        toolRow.addArrangedSubview(undoButton)
-        toolRow.addArrangedSubview(redoButton)
-        let actions: [(String, String, String, CGFloat, Selector)] = [
-            ("arrow.counterclockwise", "重选", "重选（也可右键）", 58, #selector(reselect)),
-            ("translate", "翻译", "原位翻译 T", 60, #selector(translate)),
-            ("pin", "贴图", "贴图 P", 58, #selector(pin)),
-            ("square.and.arrow.down", "保存", "保存 ⌘S", 60, #selector(save)),
-            ("doc.on.doc", "复制", "复制 ⌘C", 66, #selector(copySelection))
-        ]
-        for (icon, title, label, width, action) in actions {
-            let item = button(icon, label, title: title, width: width, action: action)
-            if action == #selector(copySelection) {
-                item.isBordered = true
-                item.bezelStyle = .rounded
-                item.bezelColor = accent
-            }
-            actionRow.addArrangedSubview(item)
-        }
-        actionRow.addArrangedSubview(button("xmark", "取消 Esc", width: 25, action: #selector(closeSession)))
-        toolbar.addSubview(toolRow)
-        toolbar.addSubview(actionRow)
-        optionDivider.boxType = .separator
-        toolbar.addSubview(optionDivider)
-
-        let swatches = markPalette.map { swatch in
-            NSImage(size: CGSize(width: 15, height: 15), flipped: false) { rect in
-                let dot = NSBezierPath(ovalIn: rect.insetBy(dx: 2, dy: 2))
-                swatch.color.setFill()
-                dot.fill()
-                NSColor.separatorColor.setStroke()
-                dot.lineWidth = 1
-                dot.stroke()
-                return true
-            }
-        }
-        let colors = NSSegmentedControl(images: swatches, trackingMode: .selectOne,
-                                         target: self, action: #selector(changeColor(_:)))
-        for (index, swatch) in markPalette.enumerated() {
-            colors.setToolTip(swatch.name, forSegment: index)
-        }
-        colors.selectedSegment = 0
-        colors.controlSize = .small
-        colors.toolTip = "标注颜色"
-        optionRow.addArrangedSubview(colors)
-        let thickness = NSSegmentedControl(labels: ["细", "中", "粗"], trackingMode: .selectOne,
-                                            target: self, action: #selector(changeThickness))
-        thickness.selectedSegment = 1
-        thickness.controlSize = .small
-        thickness.toolTip = "线条粗细"
-        self.thickness = thickness
-        optionRow.addArrangedSubview(thickness)
-        toolbar.addSubview(optionRow)
+    func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
+        guard selector == #selector(NSResponder.cancelOperation(_:)) else { return false }
+        field?.removeFromSuperview()
+        field = nil
+        textOrigin = nil
+        window?.makeFirstResponder(self)
+        updateUI()
+        return true
     }
 
-    private func button(_ icon: String, _ label: String, title: String? = nil, width: CGFloat = 28, action: Selector) -> NSButton {
-        let image = NSImage(systemSymbolName: icon, accessibilityDescription: label)
-            ?? NSImage(systemSymbolName: "character", accessibilityDescription: label)!
-        let button = CaptureButton(image: image, target: self, action: action)
-        button.bezelStyle = .texturedRounded
-        button.isBordered = false
-        if let title {
-            button.title = title
-            button.imagePosition = .imageLeading
-            button.font = .systemFont(ofSize: 11, weight: .medium)
+    private func perform(_ command: CaptureToolbar.Command) {
+        switch command {
+        case .finish(let action): finish(action); return
+        case .cancel: cancel?(); return
+        case .reselect: clearSelection()
+        case .select(let tool):
+            commitText()
+            activeTool = activeTool == tool ? nil : tool
+        case .color(let color):
+            commitText()
+            style.color = color
+        case .size(let size):
+            commitText()
+            style.size = size
+        case .undo:
+            undo()
+        case .redo:
+            redo()
         }
-        button.toolTip = label
-        button.setAccessibilityLabel(label)
-        button.widthAnchor.constraint(equalToConstant: width).isActive = true
-        button.heightAnchor.constraint(equalToConstant: 27).isActive = true
-        return button
-    }
-
-    @objc private func toggleTool(_ sender: NSButton) {
-        commitText()
-        let tool = MarkTool.allCases[sender.tag]
-        activeTool = activeTool == tool ? nil : tool
         window?.makeFirstResponder(self)
         updateUI()
     }
-    @objc private func changeColor(_ sender: NSSegmentedControl) {
+
+    private func undo() {
         commitText()
-        markColor = markPalette[sender.selectedSegment.clamped(to: 0...(markPalette.count - 1))].color
-        window?.makeFirstResponder(self)
+        if let mark = marks.popLast() { undone.append(mark) }
         updateUI()
     }
-    @objc private func changeThickness() { window?.makeFirstResponder(self) }
-    @objc private func undo() { if let mark = marks.popLast() { undone.append(mark); updateUI() } }
-    @objc private func redo() { if let mark = undone.popLast() { marks.append(mark); updateUI() } }
-    @objc private func copySelection() { finish(.copy) }
-    @objc private func save() { finish(.save) }
-    @objc private func pin() { finish(.pin) }
-    @objc private func translate() { finish(.translate) }
-    @objc private func reselect() { clearSelection(); window?.makeFirstResponder(self) }
-    @objc private func closeSession() { cancel?() }
+
+    private func redo() {
+        if let mark = undone.popLast() { marks.append(mark) }
+        updateUI()
+    }
 
     private func updateUI() {
         needsDisplay = true
-        let moving: Bool
-        switch drag {
-        case nil, .mark: moving = false
-        default: moving = true
+        guard mode == .standard, validSelection, let selection else {
+            toolbar.isHidden = true
+            return
         }
-        let visible = mode == .standard && validSelection && !moving
-        toolbar.isHidden = !visible
-        guard visible, let selection else { return }
-        for (tool, button) in markButtons { button.state = activeTool == tool ? .on : .off }
-        undoButton?.isEnabled = !marks.isEmpty
-        redoButton?.isEnabled = !undone.isEmpty
-        optionRow.isHidden = activeTool == nil
-        let width = max(toolRow.fittingSize.width, actionRow.fittingSize.width) + 16
-        let height: CGFloat = activeTool == nil ? 72 : 100
-        let x = max(5, min(bounds.width - width - 5, selection.maxX - width))
-        let y = selection.maxY + height + 6 <= bounds.height
-            ? selection.maxY + 6 : max(5, selection.minY - height - 6)
-        toolbar.frame = CGRect(x: x, y: y, width: width, height: height)
-        toolRow.frame = CGRect(x: 8, y: height - 33, width: toolRow.fittingSize.width, height: 28)
-        actionRow.frame = CGRect(x: 8, y: 5, width: actionRow.fittingSize.width, height: 28)
-        optionDivider.frame = CGRect(x: 9, y: 36, width: width - 18, height: 1)
-        optionRow.frame = CGRect(x: 10, y: 39, width: optionRow.fittingSize.width, height: 23)
+        if case .new = drag {
+            toolbar.isHidden = true
+            return
+        }
+
+        let safeInsets = window?.screen?.safeAreaInsets ?? NSEdgeInsets()
+        let available = CGRect(x: bounds.minX + 9 + safeInsets.left, y: bounds.minY + 9 + safeInsets.top,
+                               width: bounds.width - 18 - safeInsets.left - safeInsets.right,
+                               height: bounds.height - 18 - safeInsets.top - safeInsets.bottom)
+        let hasDraft = field?.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+        toolbar.show(near: selection, within: available, tool: activeTool, color: style.color,
+                     size: style.size, canUndo: !marks.isEmpty || hasDraft, canRedo: !undone.isEmpty && !hasDraft)
     }
 
     override func draw(_ dirtyRect: CGRect) {
@@ -637,8 +569,11 @@ private final class CaptureCanvas: NSView, NSTextFieldDelegate {
         }
         let size = "\(Int(pixels.width)) × \(Int(pixels.height))"
         let x = min(max(7, area.minX), bounds.width - 110)
-        let y = max(7, area.minY - 25)
-        label(size, rect: CGRect(x: x, y: y, width: 104, height: 21), in: context)
+        let badgeLocations = [area.minY - 25, area.maxY + 4, area.minY + 5].map { y in
+            CGRect(x: x, y: min(max(7, y), bounds.height - 28), width: 104, height: 21)
+        }
+        let badge = badgeLocations.first(where: { !toolbar.overlaps($0) }) ?? badgeLocations[0]
+        label(size, rect: badge, in: context)
     }
 
     private func drawCrosshair(at point: CGPoint, in context: CGContext) {
@@ -696,20 +631,6 @@ private final class CaptureCanvas: NSView, NSTextFieldDelegate {
         drawText(title, in: rect.insetBy(dx: 8, dy: 4), font: .monospacedDigitSystemFont(ofSize: 11, weight: .medium),
                  color: .white, context: context)
     }
-}
-
-private extension NSBox {
-    static func separator() -> NSBox {
-        let box = NSBox()
-        box.boxType = .separator
-        box.widthAnchor.constraint(equalToConstant: 1).isActive = true
-        box.heightAnchor.constraint(equalToConstant: 20).isActive = true
-        return box
-    }
-}
-
-private extension Int {
-    func clamped(to range: ClosedRange<Int>) -> Int { Swift.min(range.upperBound, Swift.max(self, range.lowerBound)) }
 }
 
 private func - (lhs: CGPoint, rhs: CGPoint) -> CGPoint { CGPoint(x: lhs.x - rhs.x, y: lhs.y - rhs.y) }
